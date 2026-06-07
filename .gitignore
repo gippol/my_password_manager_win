@@ -1,0 +1,33 @@
+## NGD (Non-Goal Data) / ビルド成果物・一時ファイルの除外
+[Bb]in/
+[Oo]bj/
+[Log]/
+[Logs]/
+
+## Visual Studio の一時ファイル・設定ファイル
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## キャッシュおよびツール関連
+.nuget/
+*.nuget.props
+*.nuget.targets
+packages/
+!packages/repositories.config
+
+## ClickOnce 公開用データ
+publish/
+*.publish.htm
+
+## 開発環境（VS Codeなど）やOS固有のファイル
+.vscode/
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+## テスト結果
+TestResults/
+*.trx
