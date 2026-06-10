@@ -4,6 +4,9 @@
         Title="パスワードマネージャー"
         Width="900" Height="560"
         WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -45,6 +48,15 @@
                 <DataGridTextColumn Header="備考" Binding="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" Width="200"/>
             </DataGrid.Columns>
         </DataGrid>
+
+        <!-- Loading overlay -->
+        <Grid Grid.Row="1"
+              Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}"
+              Background="#BBFFFFFF">
+            <TextBlock Text="処理中..."
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       FontSize="16" Foreground="#555555"/>
+        </Grid>
 
         <!-- Footer: 追加/削除ボタン -->
         <Border Grid.Row="2" Background="#F0F0F0" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0">

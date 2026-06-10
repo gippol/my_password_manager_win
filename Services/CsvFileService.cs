@@ -26,29 +26,24 @@ namespace PasswordManager.Services
 
         public List<PasswordEntry> Load(string filePath, string passphrase)
         {
-            var entries = new List<PasswordEntry>();
             var lines = File.ReadAllLines(filePath, Encoding.UTF8);
 
-            // skip header
-            foreach (var line in lines.Skip(1))
-            {
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                var fields = ParseCsvLine(line);
-                if (fields.Count < 4) continue;
-
-                var decryptedPassword = string.Empty;
-                if (!string.IsNullOrEmpty(fields[2]))
-                    decryptedPassword = _crypto.Decrypt(fields[2], passphrase);
-
-                entries.Add(new PasswordEntry
+            return lines.Skip(1)
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .Select(ParseCsvLine)
+                .Where(fields => fields.Count >= 4)
+                .AsParallel()
+                .AsOrdered()
+                .Select(fields => new PasswordEntry
                 {
                     Site = fields[0],
                     Username = fields[1],
-                    Password = decryptedPassword,
+                    Password = string.IsNullOrEmpty(fields[2])
+                        ? string.Empty
+                        : _crypto.Decrypt(fields[2], passphrase),
                     Notes = fields[3]
-                });
-            }
-            return entries;
+                })
+                .ToList();
         }
 
         public string Save(IEnumerable<PasswordEntry> entries, string passphrase)
@@ -57,21 +52,28 @@ namespace PasswordManager.Services
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             var filePath = Path.Combine(dir, $"passwords_{timestamp}.csv");
 
+            var list = entries.ToList();
+
+            var lines = list
+                .AsParallel()
+                .AsOrdered()
+                .Select(e =>
+                {
+                    var encryptedPassword = string.IsNullOrEmpty(e.Password)
+                        ? string.Empty
+                        : _crypto.Encrypt(e.Password, passphrase);
+                    return
+                        $"{EscapeCsv(e.Site)}," +
+                        $"{EscapeCsv(e.Username)}," +
+                        $"{EscapeCsv(encryptedPassword)}," +
+                        $"{EscapeCsv(e.Notes)}";
+                })
+                .ToList();
+
             var sb = new StringBuilder();
             sb.AppendLine("Site,Username,Password,Notes");
-
-            foreach (var e in entries)
-            {
-                var encryptedPassword = string.IsNullOrEmpty(e.Password)
-                    ? string.Empty
-                    : _crypto.Encrypt(e.Password, passphrase);
-
-                sb.AppendLine(
-                    $"{EscapeCsv(e.Site)}," +
-                    $"{EscapeCsv(e.Username)}," +
-                    $"{EscapeCsv(encryptedPassword)}," +
-                    $"{EscapeCsv(e.Notes)}");
-            }
+            foreach (var line in lines)
+                sb.AppendLine(line);
 
             File.WriteAllText(filePath, sb.ToString(), Encoding.UTF8);
             return filePath;

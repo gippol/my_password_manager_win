@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using PasswordManager.Models;
@@ -15,6 +17,7 @@ namespace PasswordManager.ViewModels
         private ObservableCollection<PasswordEntry> _entries;
         private PasswordEntry _selectedEntry;
         private string _currentFileName;
+        private bool _isLoading;
 
         public ObservableCollection<PasswordEntry> Entries
         {
@@ -34,6 +37,12 @@ namespace PasswordManager.ViewModels
             set { _currentFileName = value; OnPropertyChanged(nameof(CurrentFileName)); }
         }
 
+        public bool IsLoading
+        {
+            get => _isLoading;
+            set { _isLoading = value; OnPropertyChanged(nameof(IsLoading)); }
+        }
+
         public ICommand AddCommand { get; }
         public ICommand DeleteCommand { get; }
         public ICommand SaveCommand { get; }
@@ -48,10 +57,10 @@ namespace PasswordManager.ViewModels
             DeleteCommand = new RelayCommand(ExecuteDelete, () => SelectedEntry != null);
             SaveCommand = new RelayCommand(ExecuteSave);
 
-            LoadLatestFile();
+            _ = LoadLatestFileAsync();
         }
 
-        private void LoadLatestFile()
+        private async Task LoadLatestFileAsync()
         {
             var latestFile = _csvService.FindLatestFile();
             if (latestFile == null)
@@ -60,9 +69,10 @@ namespace PasswordManager.ViewModels
                 return;
             }
 
+            IsLoading = true;
             try
             {
-                var loaded = _csvService.Load(latestFile, _passphrase);
+                var loaded = await Task.Run(() => _csvService.Load(latestFile, _passphrase));
                 Entries = new ObservableCollection<PasswordEntry>(loaded);
                 CurrentFileName = Path.GetFileName(latestFile);
             }
@@ -74,6 +84,10 @@ namespace PasswordManager.ViewModels
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
                 CurrentFileName = "（読み込み失敗）";
+            }
+            finally
+            {
+                IsLoading = false;
             }
         }
 
@@ -91,11 +105,13 @@ namespace PasswordManager.ViewModels
             SelectedEntry = null;
         }
 
-        private void ExecuteSave()
+        private async void ExecuteSave()
         {
+            var snapshot = Entries.ToList();
+            IsLoading = true;
             try
             {
-                var savedPath = _csvService.Save(Entries, _passphrase);
+                var savedPath = await Task.Run(() => _csvService.Save(snapshot, _passphrase));
                 CurrentFileName = Path.GetFileName(savedPath);
                 MessageBox.Show(
                     $"保存しました:\n{Path.GetFileName(savedPath)}",
@@ -110,6 +126,10 @@ namespace PasswordManager.ViewModels
                     "保存エラー",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+            }
+            finally
+            {
+                IsLoading = false;
             }
         }
     }
